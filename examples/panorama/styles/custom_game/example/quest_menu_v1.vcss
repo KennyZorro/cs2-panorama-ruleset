@@ -1,0 +1,379 @@
+/* quest_menu_v1 - contract: QuestMenuIds.cs. Hex only, unitless font-size, no var/rgba/display.
+   Palette: surface #12171e/#0b0f14  raised #ffffff0d  hover #ffffff1c  press #ffffff2e  track #ffffff12
+            border #ffffff14  ink #f5f7fa  ink-soft #e8eef4  muted #a3acb6  dim #6b737c
+            accent #f0a531 (light #ffd27a)  info #5aa9e6  success #9ccf4f  warn #ff8a3d  danger #e05a5a */
+
+/* Screen + card ------------------------------------------------------------ */
+
+.QmScreen
+{
+	width: 100%;
+	height: 100%;
+	z-index: 99999;
+}
+
+.QmCard
+{
+	width: 560px;
+	horizontal-align: center;
+	vertical-align: middle;
+	opacity: 1;
+	transform: translateY( 0px );
+	transition-property: opacity, transform;
+	transition-duration: 0.25s;
+	transition-timing-function: ease-out;
+}
+
+.QmCard.is-fading
+{
+	opacity: 0;
+	transform: translateY( 8px );
+	transition-duration: 0.18s;
+	transition-timing-function: ease-in;
+}
+
+.QmCard.is-off
+{
+	visibility: collapse;
+	opacity: 0;
+	transition-duration: 0s;
+}
+
+.QmBg
+{
+	width: 100%;
+	height: 100%;
+	background-color: gradient( linear, 0% 0%, 0% 100%, from( #12171ee8 ), to( #0b0f14f2 ) );
+	border: 1px solid #ffffff14;
+	border-radius: 3px;
+	box-shadow: #000000c0 0px 8px 30px 0px;
+	world-blur: gaussian( 2 );
+}
+
+.QmAccentBar
+{
+	width: 3px;
+	height: 100%;
+	horizontal-align: left;
+	background-color: #f0a531;
+}
+
+.QmContent
+{
+	width: 100%;
+	height: fit-children;
+	flow-children: down;
+	padding: 0px 16px 16px 16px;
+}
+
+/* Title bar ---------------------------------------------------------------- */
+
+.QmTitleBar
+{
+	width: 100%;
+	height: 44px;
+	flow-children: right;
+}
+
+Label.QmTitle
+{
+	width: fill-parent-flow( 1.0 );
+	vertical-align: middle;
+	font-size: 16;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: #f5f7fa;
+}
+
+.QmIconBtn
+{
+	width: 28px;
+	height: 28px;
+	flow-children: none;
+	vertical-align: middle;
+	background-color: #ffffff0d;
+	border-radius: 3px;
+	wash-color: none;
+	transition-property: background-color;
+	transition-duration: 0.15s;
+}
+
+.QmIconBtn:hover
+{
+	background-color: #e05a5a44;
+	cursor: pointer;
+	sound: "UIPanorama.generic_button_rollover";
+}
+
+.QmIconBtn:active
+{
+	background-color: #e05a5a88;
+	sound: "UIPanorama.generic_button_press";
+}
+
+.QmCloseX
+{
+	width: 12px;
+	height: 2px;
+	horizontal-align: center;
+	vertical-align: middle;
+	background-color: #f5f7fa;
+}
+
+.QmCloseA { transform: rotateZ( 45deg ); }
+.QmCloseB { transform: rotateZ( -45deg ); }
+
+/* Tabs --------------------------------------------------------------------- */
+
+.QmTabs
+{
+	width: 100%;
+	height: fit-children;
+	flow-children: right;
+	margin-bottom: 12px;
+}
+
+.QmTab
+{
+	height: 28px;
+	flow-children: none;
+	padding: 0px 12px 0px 12px;
+	margin-right: 8px;
+	background-color: #ffffff0d;
+	border: 1px solid #00000000;
+	border-radius: 3px;
+	wash-color: none;
+	transition-property: background-color, border;
+	transition-duration: 0.15s;
+}
+
+.QmTab:hover
+{
+	background-color: #ffffff1c;
+	border: 1px solid #f0a53166;
+	cursor: pointer;
+	sound: "UIPanorama.generic_button_rollover";
+}
+
+.QmTab:active
+{
+	background-color: #ffffff2e;
+	sound: "UIPanorama.generic_button_press";
+}
+
+.QmTab.is-active
+{
+	background-color: #f0a53122;
+	border: 1px solid #f0a531;
+}
+
+Label.QmTabLabel
+{
+	vertical-align: middle;
+	font-size: 14;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: #e8eef4;
+}
+
+/* Rows --------------------------------------------------------------------- */
+
+.QmRows
+{
+	width: 100%;
+	height: fit-children;
+	flow-children: down;
+}
+
+.QmRow
+{
+	width: 100%;
+	height: 56px;
+	flow-children: right;
+	margin-bottom: 8px;
+	background-color: #ffffff0d;
+	border: 1px solid #ffffff14;
+	border-radius: 3px;
+}
+
+.QmRow.is-off
+{
+	visibility: collapse;
+}
+
+.QmRowTone
+{
+	width: 3px;
+	height: 100%;
+	background-color: #a3acb6;
+}
+
+.QmRowBody
+{
+	width: fill-parent-flow( 1.0 );
+	height: 100%;
+	flow-children: down;
+	padding: 8px 12px 8px 12px;
+}
+
+.QmRowHead
+{
+	width: 100%;
+	height: 20px;
+	flow-children: right;
+	margin-bottom: 8px;
+}
+
+Label.QmRowName
+{
+	width: fill-parent-flow( 1.0 );
+	vertical-align: middle;
+	font-size: 14;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: #e8eef4;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+Label.QmRowValue
+{
+	width: 80px;
+	vertical-align: middle;
+	font-size: 14;
+	text-align: right;
+	color: #f0a531;
+}
+
+.QmTrack
+{
+	width: 100%;
+	height: 6px;
+	flow-children: none;
+	background-color: #ffffff12;
+	border-radius: 3px;
+	overflow: clip;
+}
+
+.QmFill
+{
+	width: 100%;
+	height: 100%;
+	background-color: gradient( linear, 0% 0%, 100% 0%, from( #f0a531 ), to( #ffd27a ) );
+	clip: rect( 0%, 0%, 100%, 0% );
+	transition-property: clip;
+	transition-duration: 0.35s;
+	transition-timing-function: ease-out;
+}
+
+.QmFill.p10  { clip: rect( 0%, 10%, 100%, 0% ); }
+.QmFill.p20  { clip: rect( 0%, 20%, 100%, 0% ); }
+.QmFill.p30  { clip: rect( 0%, 30%, 100%, 0% ); }
+.QmFill.p40  { clip: rect( 0%, 40%, 100%, 0% ); }
+.QmFill.p50  { clip: rect( 0%, 50%, 100%, 0% ); }
+.QmFill.p60  { clip: rect( 0%, 60%, 100%, 0% ); }
+.QmFill.p70  { clip: rect( 0%, 70%, 100%, 0% ); }
+.QmFill.p80  { clip: rect( 0%, 80%, 100%, 0% ); }
+.QmFill.p90  { clip: rect( 0%, 90%, 100%, 0% ); }
+.QmFill.p100 { clip: rect( 0%, 100%, 100%, 0% ); }
+
+.tone-success .QmRowTone { background-color: #9ccf4f; }
+.tone-warn .QmRowTone    { background-color: #ff8a3d; }
+.tone-danger .QmRowTone  { background-color: #e05a5a; }
+
+Label.QmEmpty
+{
+	width: 100%;
+	height: 56px;
+	font-size: 14;
+	text-align: center;
+	vertical-align: middle;
+	color: #a3acb6;
+}
+
+Label.QmEmpty.is-off
+{
+	visibility: collapse;
+}
+
+/* Pager -------------------------------------------------------------------- */
+
+.QmPager
+{
+	width: fit-children;
+	height: 32px;
+	flow-children: right;
+	horizontal-align: center;
+	margin-top: 4px;
+}
+
+.QmNav
+{
+	width: 36px;
+	height: 28px;
+	flow-children: none;
+	vertical-align: middle;
+	background-color: #ffffff0d;
+	border-radius: 3px;
+	wash-color: none;
+	transition-property: background-color;
+	transition-duration: 0.15s;
+}
+
+.QmNav:hover
+{
+	background-color: #ffffff1c;
+	cursor: pointer;
+	sound: "UIPanorama.generic_button_rollover";
+}
+
+.QmNav:active
+{
+	background-color: #ffffff2e;
+	sound: "UIPanorama.generic_button_press";
+}
+
+.QmNav.is-disabled
+{
+	opacity: 0.35;
+}
+
+.QmNav.is-disabled:hover
+{
+	background-color: #ffffff0d;
+	cursor: default;
+	sound: "";
+}
+
+Label.QmNavLabel
+{
+	width: 100%;
+	vertical-align: middle;
+	text-align: center;
+	font-size: 18;
+	color: #e8eef4;
+}
+
+Label.QmPage
+{
+	width: 72px;
+	vertical-align: middle;
+	text-align: center;
+	font-size: 14;
+	color: #a3acb6;
+}
+
+/* Client-driven root classes (unverified) ---------------------------------- */
+
+.HUD_SCOREBOARD_VISIBLE .QmScreen
+{
+	visibility: collapse;
+}
+
+/* Themes: generated from one palette list, accent rules only --------------- */
+
+.theme-blue .QmAccentBar      { background-color: #5b8cff; }
+.theme-blue .QmTab.is-active  { background-color: #5b8cff22; border: 1px solid #5b8cff; }
+.theme-blue .QmTab:hover      { border: 1px solid #5b8cff66; }
+.theme-blue Label.QmRowValue  { color: #5b8cff; }
+.theme-blue .QmFill           { background-color: #5b8cff; }

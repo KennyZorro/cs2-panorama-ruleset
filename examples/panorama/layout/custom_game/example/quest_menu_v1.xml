@@ -1,0 +1,94 @@
+<root>
+	<styles>
+		<include src="s2r://panorama/styles/csgostyles.vcss" />
+		<include src="s2r://panorama/styles/custom_game/example/quest_menu_v1.vcss" />
+	</styles>
+
+	<!-- example:quest-menu v1 rows=4 tabs=3 - contract: QuestMenuIds.cs -->
+	<Panel class="QmScreen" hittest="false">
+		<Panel id="qm-root" class="QmCard is-off theme-gold" hittest="false">
+			<Panel class="QmBg" hittest="false" />
+			<Panel class="QmAccentBar" hittest="false" />
+			<Panel class="QmContent" hittest="false">
+				<Panel class="QmTitleBar" hittest="false">
+					<Label class="QmTitle stratum-bold-tf" hittest="false" text="{s:qm_title}" />
+					<Button id="qm-close" class="QmIconBtn">
+						<Panel class="QmCloseX QmCloseA" hittest="false" />
+						<Panel class="QmCloseX QmCloseB" hittest="false" />
+					</Button>
+				</Panel>
+				<Panel class="QmTabs" hittest="false">
+					<Button id="qm-tab-0" class="QmTab is-active">
+						<Label class="QmTabLabel stratum-bold-tf" hittest="false" text="{s:qm_tab_0}" />
+					</Button>
+					<Button id="qm-tab-1" class="QmTab">
+						<Label class="QmTabLabel stratum-bold-tf" hittest="false" text="{s:qm_tab_1}" />
+					</Button>
+					<Button id="qm-tab-2" class="QmTab">
+						<Label class="QmTabLabel stratum-bold-tf" hittest="false" text="{s:qm_tab_2}" />
+					</Button>
+				</Panel>
+				<Panel class="QmRows" hittest="false">
+					<Panel id="qm-row-0" class="QmRow tone-neutral is-off" hittest="false">
+						<Panel class="QmRowTone" hittest="false" />
+						<Panel class="QmRowBody" hittest="false">
+							<Panel class="QmRowHead" hittest="false">
+								<Label class="QmRowName stratum-bold-tf" hittest="false" text="{s:qm_r0_name}" />
+								<Label class="QmRowValue stratum-bold-tf" hittest="false" text="{s:qm_r0_value}" />
+							</Panel>
+							<Panel class="QmTrack" hittest="false">
+								<Panel id="qm-fill-0" class="QmFill p0" hittest="false" />
+							</Panel>
+						</Panel>
+					</Panel>
+					<Panel id="qm-row-1" class="QmRow tone-neutral is-off" hittest="false">
+						<Panel class="QmRowTone" hittest="false" />
+						<Panel class="QmRowBody" hittest="false">
+							<Panel class="QmRowHead" hittest="false">
+								<Label class="QmRowName stratum-bold-tf" hittest="false" text="{s:qm_r1_name}" />
+								<Label class="QmRowValue stratum-bold-tf" hittest="false" text="{s:qm_r1_value}" />
+							</Panel>
+							<Panel class="QmTrack" hittest="false">
+								<Panel id="qm-fill-1" class="QmFill p0" hittest="false" />
+							</Panel>
+						</Panel>
+					</Panel>
+					<Panel id="qm-row-2" class="QmRow tone-neutral is-off" hittest="false">
+						<Panel class="QmRowTone" hittest="false" />
+						<Panel class="QmRowBody" hittest="false">
+							<Panel class="QmRowHead" hittest="false">
+								<Label class="QmRowName stratum-bold-tf" hittest="false" text="{s:qm_r2_name}" />
+								<Label class="QmRowValue stratum-bold-tf" hittest="false" text="{s:qm_r2_value}" />
+							</Panel>
+							<Panel class="QmTrack" hittest="false">
+								<Panel id="qm-fill-2" class="QmFill p0" hittest="false" />
+							</Panel>
+						</Panel>
+					</Panel>
+					<Panel id="qm-row-3" class="QmRow tone-neutral is-off" hittest="false">
+						<Panel class="QmRowTone" hittest="false" />
+						<Panel class="QmRowBody" hittest="false">
+							<Panel class="QmRowHead" hittest="false">
+								<Label class="QmRowName stratum-bold-tf" hittest="false" text="{s:qm_r3_name}" />
+								<Label class="QmRowValue stratum-bold-tf" hittest="false" text="{s:qm_r3_value}" />
+							</Panel>
+							<Panel class="QmTrack" hittest="false">
+								<Panel id="qm-fill-3" class="QmFill p0" hittest="false" />
+							</Panel>
+						</Panel>
+					</Panel>
+					<Label id="qm-empty" class="QmEmpty stratum-medium-tf is-off" hittest="false" text="{s:qm_empty}" />
+				</Panel>
+				<Panel class="QmPager" hittest="false">
+					<Button id="qm-prev" class="QmNav is-disabled">
+						<Label class="QmNavLabel stratum-bold-tf" hittest="false" text="‹" />
+					</Button>
+					<Label class="QmPage stratum-bold-tf" hittest="false" text="{s:qm_page}" />
+					<Button id="qm-next" class="QmNav is-disabled">
+						<Label class="QmNavLabel stratum-bold-tf" hittest="false" text="›" />
+					</Button>
+				</Panel>
+			</Panel>
+		</Panel>
+	</Panel>
+</root>

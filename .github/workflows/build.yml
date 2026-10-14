@@ -1,0 +1,27 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build examples
+        run: dotnet build examples/Panorama.Examples.csproj -c Release
+
+      - name: Lint Panorama stylesheets
+        shell: bash
+        run: |
+          pattern='(^|[{;])[[:space:]]*display[[:space:]]*:|(rgba?|hsla?|calc|var)[[:space:]]*\(|background-size[[:space:]]*:[[:space:]]*contain([^s]|$)|@media|@define|::(before|after)|visibility[[:space:]]*:[[:space:]]*hidden|overflow[[:space:]]*:[^;]*hidden|background-blur|vertical-align[[:space:]]*:[[:space:]]*center|font-size[[:space:]]*:[[:space:]]*[0-9.]+[a-z%]+|:(selected|disabled|focus)([^a-z-]|$)'
+          if grep -rnEi "$pattern" examples/panorama --include='*.vcss'; then
+            echo "Forbidden Panorama CSS found (see RULESET.md §5.2)."
+            exit 1
+          fi
