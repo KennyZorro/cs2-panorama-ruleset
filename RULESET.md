@@ -61,6 +61,10 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 - **Spectators:** keyvalue `observable` (default `false`) controls whether spectators see the HUD of the spectated player. ⚠️ Unverified.
 - **Threads:** all Panorama writes ONLY on the game thread. After `await` → `Server.NextFrame`.
 - **Timers:** NEVER `Kill()` a one-shot timer from inside another one-shot timer's callback (the native list is erased by index → crash). Cancel by token instead. ✅ Proven.
+- **Stale addon wins:** a mounted Workshop VPK that contains the same layout path takes precedence over loose or manually deployed files – on the server and on the client. The new `.vxml_c` is then present on disk but never loaded. Symptom: `[custom_hud] Unable to find panel with id '<id>'` for every new id while the old ids keep working. → Before testing a layout change, unmount/remove older VPKs of the addon on server **and** client, then restart both. ✅ Proven.
+- **Reading "Unable to find panel with id":** the log lists only ids that actually received a write, so the pattern tells which writes ran (e.g. only rows whose class differs from the XML default). A missing root id together with working sibling roots means "old layout loaded", not "layout broken" – a broken layout loses every id. ✅ Proven.
+- **Global vs per-player state:** `SetDialogVariableString` / `SetHasClass` without a player write `GlobalLayoutState` for everyone; per-player writes overlay it. Use global writes for content that is identical for all viewers (e.g. filler text) – one write instead of one per player. A variable is either global or per player, never both (§4.2). ✅ Proven (global text reaches every client); mixing global and per-player variables on one panel ⚠️ Unverified.
+- **Same-tick changes coalesce:** writing a default and then a new value in the same tick sends only the net change. After a round restart, write the defaults in one tick and the new values in a later tick, otherwise a value equal to the previous round's never reaches the rebuilt client panel. ⚠️ Unverified (follows from the round-restart rule).
 
 ---
 
@@ -171,6 +175,14 @@ Unknown or wrong CSS is **dropped without a log** (sometimes the whole block; a 
 
 `display`, flexbox, grid, `calc()`, `var()`, `@define`, `@media`, `rgb()/rgba()/hsl()`, `::before/::after`, `background-size: contain`, `visibility: hidden`, `overflow: hidden`, `font-size` with a unit, `vertical-align: center`, `background-blur`, `transition` shorthand, width transitions for bars, `:selected`, `:disabled`, `:focus`, class name `hidden`/`Hidden` (collides with `csgostyles`).
 
+Avoid (not proven, may be dropped silently – use the replacement):
+
+| Avoid | Instead |
+| --- | --- |
+| negative `margin` ⚠️ | position with alignment, or flip a box with `transform: rotateZ( 180deg )` |
+| `box-shadow` (or other unlisted properties) in `transition-property` ⚠️ | transition only `opacity`, `transform`, `clip`, `background-color`, `brightness`; switch the shadow without a transition |
+| relying on `animation-fill-mode: forwards` for the end state ⚠️ | make the resting style under the trigger class equal the last keyframe (§12.5) |
+
 ### 5.3 Layout traps
 
 - `%` sizes need a sized parent.
@@ -180,7 +192,8 @@ Unknown or wrong CSS is **dropped without a log** (sometimes the whole block; a 
 - `fill-parent-flow` for height only inside `down` parents, for width only inside `right` parents.
 - Background panel (`width/height: 100%`) as the first child; content as a sibling on top (`flow-children: none` on the parent).
 - `Button`: set `wash-color: none`, otherwise the default style tints it.
-- Restarting an animation: alternate between two class names that use the same keyframes (§12.2).
+- Restarting an animation: alternate between two class names that use the same keyframes (§12.2). If the class sits on an ancestor (e.g. the root) and not on the animated panel, give the two classes two identically defined keyframes with **different names** (`xx-a` / `xx-b`) – a new `animation-name` always restarts.
+- **`fit-children` is capped by a smaller parent.** Content that is larger than its clipping window (scrolling strip, reel, marquee) MUST get an explicit size (e.g. `rows × row height`) and `overflow: noclip` on itself; only the window clips (`overflow: clip clip`). With `fit-children` the content is only as tall as the window, the rest is never laid out and scrolls in empty. ✅ Symptom proven in game; explicit size as the fix ⚠️ retest pending.
 
 ---
 
@@ -308,6 +321,7 @@ Server fade grace before `is-off` ≥ the longest exit duration. Animate only to
 | **Keyboard menu** | no capture; W/S moves `is-focus`, D/E selects, A goes back | rising-edge detection; poll only players with an open menu |
 | **Icons** | `Panel` + `ico-<name>` class → `background-image` | stock images (`s2r://panorama/images/…`) or images compiled into the addon |
 | **Player-chosen position** | `pos-left/center/right` on the root | class group, not coordinates |
+| **Reel / scrolling strip** (slot machine, roulette) | fixed row pool in a clip window; the result always sits in the same row → one keyframe distance (§12.5) | explicit strip height; filler rows global, written once per round; per viewer only the result row + root classes; restart via `replay-0/1` with `-a/-b` keyframes; resting transform = end position; sounds on the server follow the same easing (OnTick scheduler). ⚠️ Unverified as a whole (in-game test pending) |
 
 ---
 
@@ -375,6 +389,8 @@ NEVER kill and respawn the layout entity mid-map to "reset" it.
 | Name budget | ≤ 1244 variables per layout; pools as small as needed; when tight use row scope (§4.2) or a second layout |
 | Free memory | `Forget(slot)` on disconnect; drop caches on map change/entity loss |
 | Measure | timers around the `OnTick` and `CheckTransmit` handlers; target: idle ≈ one comparison |
+| Many timed steps | one `OnTick` scheduler with per-slot timestamps (`Server.CurrentTime`) instead of one timer per step; exit with one comparison while nothing is active |
+| Same content for everyone | global writes (§1.3) for filler/static text; per player only what differs |
 
 ---
 
@@ -528,6 +544,13 @@ Write 1: `span-N`. Write 2 (next tick): `is-running`. The server writes nothing 
 
 Re-adding a class does not restart an animation. Register `replay-0`/`replay-1` as one group and switch to the other one for every new entry.
 
+When the replay class is set on an ancestor (root) instead of the animated panel, use two identical keyframes with different names – a changed `animation-name` always restarts:
+
+```css
+.XxRoot.replay-0 .XxStrip { animation-name: xx-spin-a; }
+.XxRoot.replay-1 .XxStrip { animation-name: xx-spin-b; }
+```
+
 ### 12.3 Switch
 
 ```css
@@ -547,6 +570,27 @@ Re-adding a class does not restart an animation. Register `replay-0`/`replay-1` 
 
 The icon set is one class group; the server picks the index.
 
+### 12.5 Reel / scrolling strip
+
+A strip of N rows scrolls through a window; the result always lands in row W, so one keyframe distance serves every roll. The server writes the result text into row W, then swaps `replay-0/1` – nothing per frame.
+
+```css
+.XxWindow  { width: 328px; height: 132px; overflow: clip clip; }                 /* 3 rows visible */
+.XxStrip   { width: 100%; height: 968px; flow-children: down; overflow: noclip noclip; transform: translateY( 0px ); }  /* 22 × 44px, explicit: §5.3 */
+.XxRow     { width: 100%; height: 44px; flow-children: right; }
+
+@keyframes 'xx-spin-a' { 0% { transform: translateY( 0px ); } 86% { transform: translateY( -850px ); } 100% { transform: translateY( -836px ); } }
+@keyframes 'xx-spin-b' { 0% { transform: translateY( 0px ); } 86% { transform: translateY( -850px ); } 100% { transform: translateY( -836px ); } }
+
+/* resting transform = end position: the result stays even if fill-mode is ignored */
+.XxRoot.replay-0 .XxStrip,
+.XxRoot.replay-1 .XxStrip { transform: translateY( -836px ); animation-duration: 2.0s; animation-timing-function: ease-out; animation-fill-mode: forwards; }
+.XxRoot.replay-0 .XxStrip { animation-name: xx-spin-a; }
+.XxRoot.replay-1 .XxStrip { animation-name: xx-spin-b; }
+```
+
+Distance = (W − 1) × row height (result in the middle of 3 visible rows), overshoot a few px and spring back. Filler rows are the same for everyone → global writes, once per round. Overlays (shade gradients top/bottom, win line) are later siblings of the strip inside the window. Tick sounds: the server computes when a row boundary passes the win line on the same `ease-out` curve and plays them from an `OnTick` scheduler. Reference: [cs2-roll-the-dice `Reel`](https://github.com/Kandru/cs2-roll-the-dice/pull/32). ⚠️ Unverified (in-game test pending).
+
 ---
 
 ## 13. Definition of done
@@ -562,4 +606,7 @@ The icon set is one class group; the server picks the index.
 - [ ] Rest/hover/active/disabled/selected states per button; sounds; contrast ≥ 4.5:1; meaning not by colour alone.
 - [ ] Texts from language files; font size ≥ 14; screen centre free.
 - [ ] Layout version bumped on contract change; old version kept in the addon.
+- [ ] Content larger than its clipping parent has an explicit size (no `fit-children`); no negative margins; transitions only on listed properties (§5.2).
+- [ ] Animations do not depend on `animation-fill-mode`; restarts use a changed `animation-name` when the class sits on an ancestor.
+- [ ] Before the in-game test: no older Workshop VPK of the addon mounted on server or client; the loaded `.vxml_c` contains the new ids.
 - [ ] In-game test done, or "not tested in game" stated in the PR.
