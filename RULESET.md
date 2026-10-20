@@ -589,7 +589,7 @@ A strip of N rows scrolls through a window; the result always lands in row W, so
 .XxRoot.replay-1 .XxStrip { animation-name: xx-spin-b; }
 ```
 
-Distance = (W − 1) × row height (result in the middle of 3 visible rows), overshoot a few px and spring back. Filler rows are the same for everyone → global writes, once per round. Overlays (shade gradients top/bottom, win line) are later siblings of the strip inside the window. Tick sounds: the server computes when a row boundary passes the win line on the same `ease-out` curve and plays them from an `OnTick` scheduler. Reference: [cs2-roll-the-dice `Reel`](https://github.com/Kandru/cs2-roll-the-dice/pull/32). ⚠️ Unverified (in-game test pending).
+Distance = (W − 1) × row height (result in the middle of 3 visible rows), overshoot a few px and spring back. Filler rows are the same for everyone → global writes, once per round. Overlays (shade gradients top/bottom, win line) are later siblings of the strip inside the window. Tick sounds: the server computes when a row boundary passes the win line on the same `ease-out` curve and plays them from an `OnTick` scheduler. Reference: cs2-roll-the-dice [`Reel.cs`](https://github.com/Kandru/cs2-roll-the-dice/blob/main/src/Hud/Reel.cs) and [`hud.vcss`](https://github.com/Kandru/cs2-roll-the-dice/blob/main/workshop/content/panorama/styles/custom_game/rollthedice/hud.vcss). ⚠️ Unverified (in-game test pending).
 
 ---
 
