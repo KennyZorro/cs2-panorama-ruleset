@@ -55,6 +55,7 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 - **New entity** (map change, kill, loss) starts at the XML defaults for everyone → drop all server caches.
 - **Transmit:** without a filter every client receives the entity; per-player state only overlays it. → Filter in `CheckTransmit`: send only to players whose root is visible or fading out.
 - **Burst limit:** many writes in one tick reach the client as one packet; too many → overflow kick (`NETWORK_DISCONNECT_OVERFLOW`). ✅ Proven.
+- **Not every overflow kick is a write burst:** the same `NETWORK_DISCONNECT_OVERFLOW` also follows `ProcessMessages has exhausted its CPU time budget` – the server spent too long on one client message (seen at `SIGNONSTATE_FULL`, ~400 ms, on the first connect after a plugin hot reload; the next connect took 24 ms). → Read the line before the disconnect in the server log before cutting writes. The CPU case was a one-off cold start; the cause inside the plugins is not known. Observed once.
 - **Spawn/open inside a client command:** spawning the entity (~200 ms) or a large first write in the same tick as the chat command can drop the client. → Opening MUST be decoupled by a timer (≥ 0.2 s); pre-warm the entity at map start. ✅ Proven.
 - **Name budget:** `DialogVariableNames` holds at most **1244** names per layout. Class and panel names are interned too → keep names few, ladders coarse (§10).
 - **Draw order:** the layout always draws above the base HUD. The client sets root classes `HUD_BUYMENU_VISIBLE` and `HUD_SCOREBOARD_VISIBLE`. ⚠️ Unverified.
@@ -62,8 +63,8 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 - **Threads:** all Panorama writes ONLY on the game thread. After `await` → `Server.NextFrame`.
 - **Timers:** NEVER `Kill()` a one-shot timer from inside another one-shot timer's callback (the native list is erased by index → crash). Cancel by token instead. ✅ Proven.
 - **Stale addon wins:** a mounted Workshop VPK that contains the same layout path takes precedence over loose or manually deployed files – on the server and on the client. The new `.vxml_c` is then present on disk but never loaded. Symptom: `[custom_hud] Unable to find panel with id '<id>'` for every new id while the old ids keep working. → Before testing a layout change, unmount/remove older VPKs of the addon on server **and** client, then restart both. ✅ Proven.
-- **A running client keeps loaded layouts and stylesheets:** a loose-file deploy replaces the compiled `.vxml_c` / `.vcss_c`, but a client that already loaded that path keeps the old version in memory – `retry` / reconnect does not reload it. Symptom: new ids missing (see below) or old CSS on a new layout. → Restart the client, or load a new path (`_v<N>` bump, §3), which takes effect at the next connect. ✅ Proven.
-- **The client localizes dialog variables that equal one of its tokens:** a value such as `CT`, `Counter-Terrorists` or `Terrorists` is shown translated into the *client* language (`AT-…`, `ANTITERROREINHEIT`, `TERRORISTEN` in a German client), not as sent. → Wrap such values in non-breaking spaces (`"\u00a0" + text + "\u00a0"`); it looks the same and no longer matches. ✅ Proven.
+- **A running client keeps loaded layouts and stylesheets:** a loose-file deploy replaces the compiled `.vxml_c` / `.vcss_c`, but a client that already loaded that path keeps the old version in memory – `retry` / reconnect does not reload it. Symptom: new ids missing (see below) or old CSS on a new layout. → Restart the client, or load a new path (`_v<N>` bump, §3), which takes effect at the next connect. ✅ Proven. A layout path the running client has never loaded is picked up without a restart (files deployed while the game ran, menu opened afterwards). ✅ Proven.
+- **The client localizes dialog variables that equal one of its tokens:** a value such as `CT`, `Counter-Terrorists` or `Terrorists` is shown translated into the *client* language (`AT-…`, `ANTITERROREINHEIT`, `TERRORISTEN` in a German client), not as sent. → Wrap such values in non-breaking spaces (`"\u00a0" + text + "\u00a0"`); it looks the same and no longer matches. ✅ Proven. Common UI words are tokens too: an English `Cancel` showed up as `ABBRECHEN`. Language-neutral codes (`T`, `CT`) MAY instead be literals in the XML (`text="CT"` is not localized) ✅ Proven; for words, pick a text that is no token (`Cancel ban`) or wrap it.
 - **Reading "Unable to find panel with id":** the log lists only ids that actually received a write, so the pattern tells which writes ran (e.g. only rows whose class differs from the XML default). A missing root id together with working sibling roots means "old layout loaded", not "layout broken" – a broken layout loses every id. ✅ Proven.
 - **Global vs per-player state:** `SetDialogVariableString` / `SetHasClass` without a player write `GlobalLayoutState` for everyone; per-player writes overlay it. Use global writes for content that is identical for all viewers (e.g. filler text) – one write instead of one per player. A variable is either global or per player, never both (§4.2). ✅ Proven (global text reaches every client); mixing global and per-player variables on one panel ⚠️ Unverified.
 - **Same-tick changes coalesce:** writing a default and then a new value in the same tick sends only the net change. After a round restart, write the defaults in one tick and the new values in a later tick, otherwise a value equal to the previous round's never reaches the rebuilt client panel. ⚠️ Unverified (follows from the round-restart rule).
@@ -82,9 +83,11 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 | List | fixed pool, pagination `‹ 1 / 3 ›` |
 | Scroll list | panel with `flow-children: down` + `overflow: squish scroll` holding a fixed row pool; rows get a fixed width a bit below the panel width (room for the bar). The client scrolls, the server never knows the position. Scroll bar drag under input capture ✅ Proven; mouse wheel ⚠️ Unverified |
 | Tabs/filters | buttons with exclusive `is-active` |
+| View switch | all views `visibility: collapse` by default, one class group on the root (`view-a`, `view-b` …) and `.XxCard.view-a .XxViewA { visibility: visible; }` per view; the views share one `flow-children: none` area. ✅ Proven (5 views) |
+| Sub-pages in a card | the same on a nested panel (`page-*` group on the card); a picker (`is-pick`) replaces tabs and pages by collapsing both. ✅ Proven |
 | Switch | track panel + knob `transform: translateX()` under `is-on` |
 | Dropdown | choice pool per row (≤ 6–12), `is-open` on the row |
-| Stepper | `‹ value ›` with two buttons |
+| Stepper | `‹ value ›` with two buttons; each click applies at once, the buttons get `is-disabled` at the limits. ✅ Proven |
 | Toast | pool per placement, slide/fade in, remaining-time bar |
 | Close X | two 2px bars, `rotateZ(±45deg)` |
 | Keyboard focus | `is-focus` on the entry, W/S/A/D via `player.Buttons` |
@@ -193,10 +196,10 @@ Avoid (not proven, may be dropped silently – use the replacement):
 - Centered text: label with a fixed width + `text-align: center`, or `horizontal-align: center` + `fit-children`.
 - Button label: button `flow-children: none` + fixed size; label `width: 100%`, `vertical-align: middle`, **no** `height: 100%`.
 - `fill-parent-flow` for height only inside `down` parents, for width only inside `right` parents.
-- Background panel (`width/height: 100%`) as the first child; content as a sibling on top (`flow-children: none` on the parent).
+- Background panel (`width/height: 100%`) as the first child; content as a sibling on top (`flow-children: none` on the parent). Only for a parent with a fixed size: a card with `height: fit-children` gets `background-color` / `border` on itself instead (a 100% child of a `fit-children` parent has nothing to resolve against). ✅ Proven (cards on the card itself).
 - `Button`: set `wash-color: none`, otherwise the default style tints it.
 - Restarting an animation: alternate between two class names that use the same keyframes (§12.2). If the class sits on an ancestor (e.g. the root) and not on the animated panel, give the two classes two identically defined keyframes with **different names** (`xx-a` / `xx-b`) – a new `animation-name` always restarts.
-- ⚠️ **Gap after a row of buttons:** a `Label` that follows a `flow-children: right` row of fixed-size `Button`s inside a `down` column was drawn far below the row in game – also with an explicit row height. Cause unknown. → Put the label above the row (or test the spacing in game).
+- ⚠️ **Gap after a row of buttons:** a `Label` that follows a `flow-children: right` row of fixed-size `Button`s inside a `down` column was drawn far below the row in game – also with an explicit row height. Cause unknown. → Put the label above the row (or test the spacing in game). Counter-example ✅ Proven: rows with `height: fit-children` (buttons 36px + `margin-bottom: 6px`) in a `down` column with a fixed width, followed by a hint label, rendered without a gap (cs2-mini-admin server cards).
 - **`fit-children` is capped by a smaller parent.** Content that is larger than its clipping window (scrolling strip, reel, marquee) MUST get an explicit size (e.g. `rows × row height`) and `overflow: noclip` on itself; only the window clips (`overflow: clip clip`). With `fit-children` the content is only as tall as the window, the rest is never laid out and scrolls in empty. ✅ Symptom proven in game; explicit size as the fix ⚠️ retest pending.
 
 ---
@@ -301,7 +304,7 @@ Server fade grace before `is-off` ≥ the longest exit duration. Animate only to
 - `is-disabled`: `opacity: 0.35`, hover rule neutralised, `cursor: default`, `sound: ""`; ignore the click on the server.
 - Feedback in the same tick: the click handler repaints immediately (diffs only).
 - One primary action per view. Destructive: `danger`, spatially separated, confirmed (§8).
-- Close always via the close button **and** the same chat command; menus close on round start, death and disconnect.
+- Close always via the close button **and** the same chat command; menus close on round start, death and disconnect. Exception with a reason: a tool menu (admin) MAY stay open on death and come back after the round start (§8 "Persistent menu").
 - Empty state instead of an empty area: one line of text (`qm-empty`).
 - State survives reopening (tab); the page starts at 1.
 
@@ -324,7 +327,9 @@ Server fade grace before `is-off` ≥ the longest exit duration. Animate only to
 | **Modal menu** | full screen or centred, title bar + close X, input capture | open via timer (§1.3); capture off on close; one menu per player at a time |
 | **Read-only overlay** | card at the edge, everything `hittest="false"` | never input capture; visible only when needed (transmit); `slow` fade |
 | **Leaderboard/table** | row pool, fixed column widths, `is-self` | numbers right-aligned; own row always visible (own slot at top/bottom) |
-| **Confirmation** | same button twice: label changes to "SURE?", `tone-danger`, 3 s timeout | no separate dialog needed |
+| **Confirmation** | same button twice: label changes to "SURE?", `tone-danger`, 3 s timeout | no separate dialog needed; two labels in the button (normal + `{s:xx_sure}`), `is-confirm` swaps them; any other click disarms; expiry from the `OnTick` scheduler (one comparison while nothing is armed). ✅ Proven |
+| **Picker as confirmation** (ban with duration + reason) | the action button opens a picker in place of the page; choosing the last part runs it | the picker is the confirmation, no "SURE?" on top; a cancel button; the picker closes on tab/target change. ✅ Proven |
+| **Persistent menu** (admin tools) | stays open on death; on `EventRoundStart` close + `RestoreDefaults` as required, then reopen through the normal open timer | tab, sub-page and selection survive (per-slot state), pages start at 1; ✅ Proven |
 | **Keyboard menu** | no capture; W/S moves `is-focus`, D/E selects, A goes back | rising-edge detection; poll only players with an open menu |
 | **Icons** | `Panel` + `ico-<name>` class → `background-image` | stock images (`s2r://panorama/images/…`) or images compiled into the addon |
 | **Player-chosen position** | `pos-left/center/right` on the root | class group, not coordinates |
@@ -364,10 +369,12 @@ NEVER kill and respawn the layout entity mid-map to "reset" it.
 - Per-slot state in arrays `[MaxSlots = 65]`, no `Dictionary<int,…>` on hot paths.
 - No LINQ, `yield`, closures or string formatting in tick/transmit handlers; allowed in a dirty paint when it runs only there.
 - Foreign callbacks (`OnButton`, `OnClosed`) in `try/catch`; log, never let them throw.
+- Click routing for pools: while painting, store per viewer what each pool slot shows (`_rowUser[slot, row] = player.UserId`, map entry, SteamID) and resolve the click through that table – the click then hits what the viewer saw, even if the list changed since. Store a user id or SteamID, never the player slot (a slot is reused by the next player); re-check validity and permission on click. ✅ Proven.
 - Per-viewer texts: CounterStrikeSharp's `Localizer.ForPlayer` / `GetLanguage` **throw for bots and unauthorized players (SteamID 0)**. Wrap them (`ForPlayerSafe`: SteamID 0 → server language). An exception in the middle of game logic aborts it halfway (e.g. a dice applied but never recorded). ✅ Proven.
 - Timers: cancel through a token compared in the callback (§1.3).
 - Formatting, `var` vs explicit types, namespace form: the host repository's style (`.editorconfig`, neighbouring code) wins over the style of the examples.
 - A validator script (XML/CSS against C# constants, forbidden CSS, name budget) runs before "done". If there is none: create it.
+- Generator `--check` and validators compare generated files **ignoring line endings** (`text.replace("\r\n", "\n")`): a Windows checkout with `core.autocrlf` turns the committed LF file into CRLF and every check would report "out of date". ✅ Proven. Strip CSS comments before scanning for forbidden CSS (a header comment that lists `@define` as forbidden matches otherwise).
 
 ### 9.2 XML and CSS format
 
