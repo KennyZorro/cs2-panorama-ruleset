@@ -53,6 +53,9 @@ public sealed class HudLayout
 
     public string RootId { get; }
 
+    /// <summary>Native writes so far (only real changes count): lets painters spread a large paint over ticks.</summary>
+    public long Writes { get; private set; }
+
     // ---- Contract (load time only) ----------------------------------------------------------
 
     public TextSlot Text(string panelId, string name, string authored = "")
@@ -98,6 +101,7 @@ public sealed class HudLayout
         TextBinding b = _texts[slot.Index];
         hud.SetDialogVariableStringForPlayer(player, b.PanelId, b.Name, value);
         text[slot.Index] = value;
+        Writes++;
     }
 
     public void SetFlag(CCSPlayerController player, ClassSlot slot, bool on) =>
@@ -138,11 +142,13 @@ public sealed class HudLayout
         if (prev >= 0)
         {
             hud.SetHasClassForPlayer(player, b.PanelId, b.Classes[prev], false);
+            Writes++;
         }
 
         if (next >= 0)
         {
             hud.SetHasClassForPlayer(player, b.PanelId, b.Classes[next], true);
+            Writes++;
         }
 
         state[slot.Index] = next;
@@ -161,6 +167,7 @@ public sealed class HudLayout
         TextBinding b = _texts[slot.Index];
         _entity!.SetDialogVariableString(b.PanelId, b.Name, value);
         _shared[slot.Index] = value;
+        Writes++;
     }
 
     // ---- Visibility -------------------------------------------------------------------------
@@ -240,31 +247,48 @@ public sealed class HudLayout
 
     // ---- Lifecycle --------------------------------------------------------------------------
 
-    /// <summary>Round restart: the client rebuilt the layout from XML. Write the defaults back so server and client agree.</summary>
-    public void RestoreDefaults(CCSPlayerController player)
+    /// <summary>
+    /// Round restart: the client rebuilt the layout from XML. Write the defaults back so server and client agree,
+    /// at most <paramref name="budget"/> writes per call (a filled row pool would burst; call again next tick).
+    /// True once nothing differs from the XML any more.
+    /// </summary>
+    public bool RestoreDefaults(CCSPlayerController player, int budget = int.MaxValue)
     {
-        if (!TryWrite(player, out CCSCustomHudLayout hud, out string?[] text, out short[] state))
+        if (!TryWrite(player, out CCSCustomHudLayout hud, out string?[] text, out _))
         {
-            return;
+            return true;
         }
 
+        _visible[player.Slot] = false;
+        _closingUntil[player.Slot] = 0;
+        long limit = Writes + budget;
         for (int i = 0; i < _texts.Count; i++)
         {
             TextBinding b = _texts[i];
             if (!string.Equals(text[i], b.Authored, StringComparison.Ordinal))
             {
+                if (Writes >= limit)
+                {
+                    return false;
+                }
+
                 hud.SetDialogVariableStringForPlayer(player, b.PanelId, b.Name, b.Authored);
                 text[i] = b.Authored;
+                Writes++;
             }
         }
 
         for (int i = 0; i < _classes.Count; i++)
         {
+            if (Writes >= limit)
+            {
+                return false;
+            }
+
             SetIndex(player, new ClassSlot(i), _classes[i].Authored);
         }
 
-        _visible[player.Slot] = false;
-        _closingUntil[player.Slot] = 0;
+        return true;
     }
 
     /// <summary>Disconnect: the next player in this slot starts from the XML defaults.</summary>

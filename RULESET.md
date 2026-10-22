@@ -45,9 +45,9 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 | set a width or fill level | **class ladder** `p0…p100` with `clip: rect()` |
 | set an image path | **icon class** per image (`ico-ak47` → `background-image`) |
 | per-frame countdown | **client-side transition** (`span-N` + `is-running`), one write |
-| text input, keyboard events in Panorama | chat command; keys via `player.Buttons` |
+| text input, keyboard events in Panorama | chat command (search: `!cmd <text>`, §8); keys via `player.Buttons` |
 | JavaScript, `onactivate`, Panorama events | none; clicks only via `<Button id>` + input capture |
-| read/set scroll position | pagination instead of scrolling |
+| read/set scroll position | a client-scrolled list (§2) when the position does not matter, otherwise pagination |
 
 ### 1.3 Engine behaviour the code MUST handle
 
@@ -62,6 +62,8 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 - **Threads:** all Panorama writes ONLY on the game thread. After `await` → `Server.NextFrame`.
 - **Timers:** NEVER `Kill()` a one-shot timer from inside another one-shot timer's callback (the native list is erased by index → crash). Cancel by token instead. ✅ Proven.
 - **Stale addon wins:** a mounted Workshop VPK that contains the same layout path takes precedence over loose or manually deployed files – on the server and on the client. The new `.vxml_c` is then present on disk but never loaded. Symptom: `[custom_hud] Unable to find panel with id '<id>'` for every new id while the old ids keep working. → Before testing a layout change, unmount/remove older VPKs of the addon on server **and** client, then restart both. ✅ Proven.
+- **A running client keeps loaded layouts and stylesheets:** a loose-file deploy replaces the compiled `.vxml_c` / `.vcss_c`, but a client that already loaded that path keeps the old version in memory – `retry` / reconnect does not reload it. Symptom: new ids missing (see below) or old CSS on a new layout. → Restart the client, or load a new path (`_v<N>` bump, §3), which takes effect at the next connect. ✅ Proven.
+- **The client localizes dialog variables that equal one of its tokens:** a value such as `CT`, `Counter-Terrorists` or `Terrorists` is shown translated into the *client* language (`AT-…`, `ANTITERROREINHEIT`, `TERRORISTEN` in a German client), not as sent. → Wrap such values in non-breaking spaces (`"\u00a0" + text + "\u00a0"`); it looks the same and no longer matches. ✅ Proven.
 - **Reading "Unable to find panel with id":** the log lists only ids that actually received a write, so the pattern tells which writes ran (e.g. only rows whose class differs from the XML default). A missing root id together with working sibling roots means "old layout loaded", not "layout broken" – a broken layout loses every id. ✅ Proven.
 - **Global vs per-player state:** `SetDialogVariableString` / `SetHasClass` without a player write `GlobalLayoutState` for everyone; per-player writes overlay it. Use global writes for content that is identical for all viewers (e.g. filler text) – one write instead of one per player. A variable is either global or per player, never both (§4.2). ✅ Proven (global text reaches every client); mixing global and per-player variables on one panel ⚠️ Unverified.
 - **Same-tick changes coalesce:** writing a default and then a new value in the same tick sends only the net change. After a round restart, write the defaults in one tick and the new values in a later tick, otherwise a value equal to the previous round's never reaches the rebuilt client panel. ⚠️ Unverified (follows from the round-restart rule).
@@ -78,6 +80,7 @@ Nothing is "done" without an in-game test. If no test server is available, the P
 | Progress bar | track `overflow: clip` + fill `clip: rect(0%, N%, 100%, 0%)` per class |
 | Time bar | duration class sets `transition-duration`, start class sets the target `clip` |
 | List | fixed pool, pagination `‹ 1 / 3 ›` |
+| Scroll list | panel with `flow-children: down` + `overflow: squish scroll` holding a fixed row pool; rows get a fixed width a bit below the panel width (room for the bar). The client scrolls, the server never knows the position. Scroll bar drag under input capture ✅ Proven; mouse wheel ⚠️ Unverified |
 | Tabs/filters | buttons with exclusive `is-active` |
 | Switch | track panel + knob `transform: translateX()` under `is-on` |
 | Dropdown | choice pool per row (≤ 6–12), `is-open` on the row |
@@ -162,7 +165,7 @@ Unknown or wrong CSS is **dropped without a log** (sometimes the whole block; a 
 | Shadow | `box-shadow: #rrggbbaa <x>px <y>px <blur>px <spread>px` (colour first) |
 | Text | `font-size: 14` (**unitless**); `font-family: Stratum2 Bold` or classes `stratum-bold-tf` / `stratum-medium-tf`; `color`; `letter-spacing: <px>`; `text-transform: uppercase`; `text-align: left \| center \| right`; `text-overflow: ellipsis` + `white-space: nowrap` (needs a fixed width) |
 | Visibility | `visibility: collapse \| visible`; `opacity` |
-| Clipping | `overflow: noclip \| clip \| scroll` (per axis: `noclip noclip`); `clip: rect( t, r, b, l )` |
+| Clipping | `overflow: noclip \| clip \| scroll` (per axis: `noclip noclip`); `overflow: squish scroll` for a scroll list (§2); `clip: rect( t, r, b, l )` |
 | Transform | `transform: translateX/Y( px ) \| scale3d( x, y, z ) \| rotateZ( deg )`; `brightness` |
 | Transition | `transition-property: a, b`; `transition-duration: 0.25s`; `transition-timing-function: ease-out \| ease-in \| linear \| ease-in-out` (separate properties, no shorthand) |
 | Animation | `@keyframes 'name' { … }` (**name in quotes**); `animation-name/-duration/-delay/-timing-function/-iteration-count/-fill-mode` |
@@ -193,6 +196,7 @@ Avoid (not proven, may be dropped silently – use the replacement):
 - Background panel (`width/height: 100%`) as the first child; content as a sibling on top (`flow-children: none` on the parent).
 - `Button`: set `wash-color: none`, otherwise the default style tints it.
 - Restarting an animation: alternate between two class names that use the same keyframes (§12.2). If the class sits on an ancestor (e.g. the root) and not on the animated panel, give the two classes two identically defined keyframes with **different names** (`xx-a` / `xx-b`) – a new `animation-name` always restarts.
+- ⚠️ **Gap after a row of buttons:** a `Label` that follows a `flow-children: right` row of fixed-size `Button`s inside a `down` column was drawn far below the row in game – also with an explicit row height. Cause unknown. → Put the label above the row (or test the spacing in game).
 - **`fit-children` is capped by a smaller parent.** Content that is larger than its clipping window (scrolling strip, reel, marquee) MUST get an explicit size (e.g. `rows × row height`) and `overflow: noclip` on itself; only the window clips (`overflow: clip clip`). With `fit-children` the content is only as tall as the window, the rest is never laid out and scrolls in empty. ✅ Symptom proven in game; explicit size as the fix ⚠️ retest pending.
 
 ---
@@ -307,7 +311,10 @@ Server fade grace before `is-off` ≥ the longest exit duration. Animate only to
 
 | Case | Pattern | Rules |
 | --- | --- | --- |
-| **List** | pool of N rows + pager `‹ i / n ›` | N fixed (4–8); rows of equal height; unused slots `is-off`; pager buttons `is-disabled` at the ends; no scrolling; empty-state label |
+| **List** | pool of N rows + pager `‹ i / n ›` | N fixed (4–8); rows of equal height; unused slots `is-off`; pager buttons `is-disabled` at the ends; empty-state label |
+| **Long list** (catalogue, all players) | one scroll list (§2) over a pool of up to ~64 single-line rows | pool ≥ the largest realistic count, rest `is-off`; paint under a write budget (§10); filters/sort narrow the same pool; the scroll position stays when the content changes – keep the list short enough to reread |
+| **Search** | chat command `!cmd <text>`; the menu shows the active search as an accent chip with a clear button | search before filters (the filter counts follow it); empty result has its own empty text; clear resets only the search |
+| **Two columns** (teams) | two scroll lists side by side, each its own row pool and head (name + count, team colour) | split on the server; team colour plus text, never colour alone; players without a column are left out deliberately |
 | **Tabs / filters / button group** | `flow-children: right`, buttons with exclusive `is-active` | ≤ 5 entries; counts in the label (`OPEN 3`); switching resets to page 1 |
 | **Switch** | row button + track/knob, `is-on` | label names the thing, not the state; knob `translateX`, `fast` |
 | **Choice** | stepper `‹ value ›` | preferred; dropdown (choice pool, `is-open`) only for ≤ 6 values, otherwise a sub-menu |
@@ -321,7 +328,7 @@ Server fade grace before `is-off` ≥ the longest exit duration. Animate only to
 | **Keyboard menu** | no capture; W/S moves `is-focus`, D/E selects, A goes back | rising-edge detection; poll only players with an open menu |
 | **Icons** | `Panel` + `ico-<name>` class → `background-image` | stock images (`s2r://panorama/images/…`) or images compiled into the addon |
 | **Player-chosen position** | `pos-left/center/right` on the root | class group, not coordinates |
-| **Reel / scrolling strip** (slot machine, roulette) | fixed row pool in a clip window; the result always sits in the same row → one keyframe distance (§12.5) | explicit strip height; filler rows global, written once per round; per viewer only the result row + root classes; restart via `replay-0/1` with `-a/-b` keyframes; resting transform = end position; sounds on the server follow the same easing (OnTick scheduler). ⚠️ Unverified as a whole (in-game test pending) |
+| **Reel / scrolling strip** (slot machine, roulette) | fixed row pool in a clip window; the result always sits in the same row → one keyframe distance (§12.5) | explicit strip height; filler rows global, written once per round; per viewer only the result row + root classes; restart via `replay-0/1` with `-a/-b` keyframes; resting transform = end position; sounds on the server follow the same easing (OnTick scheduler). ✅ Proven in game (spin, result row, a new spin per roll); tick sound timing ⚠️ not measured |
 
 ---
 
@@ -357,6 +364,7 @@ NEVER kill and respawn the layout entity mid-map to "reset" it.
 - Per-slot state in arrays `[MaxSlots = 65]`, no `Dictionary<int,…>` on hot paths.
 - No LINQ, `yield`, closures or string formatting in tick/transmit handlers; allowed in a dirty paint when it runs only there.
 - Foreign callbacks (`OnButton`, `OnClosed`) in `try/catch`; log, never let them throw.
+- Per-viewer texts: CounterStrikeSharp's `Localizer.ForPlayer` / `GetLanguage` **throw for bots and unauthorized players (SteamID 0)**. Wrap them (`ForPlayerSafe`: SteamID 0 → server language). An exception in the middle of game logic aborts it halfway (e.g. a dice applied but never recorded). ✅ Proven.
 - Timers: cancel through a token compared in the callback (§1.3).
 - Formatting, `var` vs explicit types, namespace form: the host repository's style (`.editorconfig`, neighbouring code) wins over the style of the examples.
 - A validator script (XML/CSS against C# constants, forbidden CSS, name budget) runs before "done". If there is none: create it.
@@ -386,6 +394,7 @@ NEVER kill and respawn the layout entity mid-map to "reset" it.
 | Do not clear hidden rows | set `is-off`, leave the old text |
 | Reuse strings | number cache (`NumberText`), static labels once per open; format only on change |
 | Avoid bursts | open via timer; space toasts; pre-warm the entity at map start |
+| Write budget for big paints | count native writes (`HudLayout.Writes`); a paint stops after ~64–72 writes and stays dirty, the next ticks finish it – rows already sent cost nothing then. The round-start `RestoreDefaults` takes a budget per tick the same way. A 48-row list arrives over a few ticks without an overflow ✅ Proven |
 | Name budget | ≤ 1244 variables per layout; pools as small as needed; when tight use row scope (§4.2) or a second layout |
 | Free memory | `Forget(slot)` on disconnect; drop caches on map change/entity loss |
 | Measure | timers around the `OnTick` and `CheckTransmit` handlers; target: idle ≈ one comparison |
@@ -400,7 +409,7 @@ All code lives in [`examples/`](examples/) and builds against CounterStrikeSharp
 
 | File | Content |
 | --- | --- |
-| [`Hud/HudLayout.cs`](examples/src/Hud/HudLayout.cs) | entity spawn/adopt, per-slot diff caches, flags/groups/ladders, shared text, show/hide with fade grace, round-restart defaults, transmit filter |
+| [`Hud/HudLayout.cs`](examples/src/Hud/HudLayout.cs) | entity spawn/adopt, per-slot diff caches, flags/groups/ladders, shared text, show/hide with fade grace, round-restart defaults (optionally under a write budget), write counter, transmit filter |
 | [`Hud/NumberText.cs`](examples/src/Hud/NumberText.cs) | allocation-free number strings |
 | [`Hud/KeyNav.cs`](examples/src/Hud/KeyNav.cs) | keyboard navigation without input capture |
 | [`QuestMenu/QuestMenuIds.cs`](examples/src/QuestMenu/QuestMenuIds.cs) | the layout contract in C# |
@@ -608,5 +617,9 @@ Distance = (W − 1) × row height (result in the middle of 3 visible rows), ove
 - [ ] Layout version bumped on contract change; old version kept in the addon.
 - [ ] Content larger than its clipping parent has an explicit size (no `fit-children`); no negative margins; transitions only on listed properties (§5.2).
 - [ ] Animations do not depend on `animation-fill-mode`; restarts use a changed `animation-name` when the class sits on an ancestor.
-- [ ] Before the in-game test: no older Workshop VPK of the addon mounted on server or client; the loaded `.vxml_c` contains the new ids.
+- [ ] Before the in-game test: no older Workshop VPK of the addon mounted on server or client; the loaded `.vxml_c` contains the new ids; the client restarted (or the layout path changed) since the last deploy.
+- [ ] Values that may equal a client localization token (team names, short codes) are wrapped (§1.3).
+- [ ] Per-viewer texts are safe for bots (§9.1); lists larger than ~20 rows paint under a write budget (§10).
 - [ ] In-game test done, or "not tested in game" stated in the PR.
+
+Testing tips (local dev server, client started with `-netconport`): send client commands through the netconsole as console commands (`rtd info`) rather than `say !rtd info` – the chat path was unreliable right after a reconnect. A `retry` often leaves the pause menu open (`gameui_hide`). Before sending mouse input, make sure the game window is in the foreground – the user may be using the desktop.
